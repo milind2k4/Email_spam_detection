@@ -9,6 +9,7 @@ venv/
 env/
 
 # LaTeX Compilation Artifacts
+*.md
 *.aux
 *.log
 *.out
