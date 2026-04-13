@@ -1,0 +1,625 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{longtable}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdftitle={Email Spam Detection using Machine Learning},
+}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,         
+    breaklines=true,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=5pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1cm}
+    
+    \Huge
+    \textbf{Email Spam Detection using Machine Learning}
+    
+    \vspace{1.5cm}
+    
+    \Large
+    \textbf{MACHINE LEARNING CA-2 PROJECT REPORT}
+    
+    \vspace{2cm}
+    
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushleft} \large
+            \textbf{Submitted By:}\\
+            Milind Pushp \\ Roll No. 202401100500105\\
+            Misty Jangid \\ Roll No. 202401100500106\\
+            Semester IV, Section B
+        \end{flushleft}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.45\textwidth}
+        \begin{flushright} \large
+            \textbf{Submitted To:}\\
+            Dr. Shrankhla Saxena\\
+            Assistant Professor
+        \end{flushright}
+    \end{minipage}
+    
+    \vfill
+    
+    \Large
+    \textbf{Department of Computer Science and Information Technology}\\
+    \textbf{KIET Deemed to Be University}\\
+    \vspace{0.8cm}
+    \textbf{13 April, 2026}
+    
+\end{titlepage}
+
+\begin{abstract}
+Email communication is one of the most widely used forms of digital correspondence in both personal and professional settings. With this widespread adoption, spam emails have become a significant problem - cluttering inboxes, consuming bandwidth, and acting as a vector for phishing attacks and malware distribution.
+
+\vspace{1em}
+
+This project implements and compares six classical machine-learning classifiers to automatically detect spam emails using the \textbf{Spambase dataset} from the UCI Machine Learning Repository. The dataset consists of 4,601 emails described by 57 features - 48 word-frequency attributes, 6 character-frequency attributes, and 3 capital-letter run-length statistics - along with a binary label indicating spam (1) or ham (0).
+
+\vspace{1em}
+
+The methodology includes data loading, exploratory analysis, duplicate removal, missing-value imputation, feature scaling (StandardScaler), and an 80/20 stratified train-test split. Six models are trained: Logistic Regression, SVM (Linear kernel), SVM (RBF kernel), Random Forest, K-Nearest Neighbours, and Na\"{\i}ve Bayes. Performance is measured using accuracy, precision, recall, F1-score, and ROC-AUC.
+
+\vspace{1em}
+
+The \textbf{Random Forest} classifier achieved the highest test accuracy of \textbf{$\sim$94.30\%} with an ROC-AUC of \textbf{$\sim$0.99}, demonstrating its strong suitability for this task. The notebook is fully reproducible (due to set seed via \texttt{random\_state=42}) and includes visualisations covering class distribution, feature importance, confusion matrices, ROC curves, and actual-vs-predicted comparisons.
+
+\vspace{0.5cm}
+\noindent\textbf{Keywords:} Spam Detection, Classification, Random Forest, SVM, Spambase, scikit-learn
+\end{abstract}
+
+\newpage
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Background}
+
+\subsubsection*{Overview of the ML Concept}
+Spam detection is a classic \textbf{binary classification} problem in supervised machine learning. Given a set of labelled emails (spam / not-spam), the goal is to train a model that can generalise to new, unseen emails. The learning signal comes from statistical patterns in the email text - how often certain words or characters appear, and how the capital letters are used.
+
+A variety of algorithms are applicable here, ranging from simple probabilistic methods (Na\"{\i}ve Bayes - the historical baseline for spam filters) to sophisticated ensemble methods (Random Forests, Gradient Boosting). Modern commercial spam filters often layer classical ML with neural networks and natural-language-processing techniques.
+
+\subsubsection*{Domain Context}
+Email spam accounts for roughly \textbf{47.5\% of all global email traffic} (Antispamengine.com, 2024). Beyond annoyance, spam is the primary delivery mechanism for:
+\begin{itemize}
+    \item \textbf{Phishing} - credential theft through fake login pages.
+    \item \textbf{Malware / ransomware} - via malicious attachments or links.
+    \item \textbf{Advance-fee fraud} - financial scams.
+\end{itemize}
+
+Accurate, low-latency spam filters are therefore critical infrastructure for every email service provider.
+
+\subsection{Problem Statement}
+Given a numerical feature representation of an email derived from word-frequency statistics, character-frequency statistics, and capital-letter run-length statistics, \textbf{build a machine-learning model that can correctly classify whether an email is spam (1) or ham (0)} with high accuracy, precision, and recall.
+
+The core challenge is to minimise \textbf{false negatives} (spam classified as ham, which is harmful) while keeping \textbf{false positives} (ham classified as spam, which annoys users) acceptably low.
+
+\subsection{Objectives}
+\begin{itemize}
+    \item Load and explore the UCI Spambase dataset (4,601 samples, 57 features).
+    \item Perform exploratory data analysis (EDA) including class-distribution and feature-importance visualisations.
+    \item Pre-process data: remove duplicates, impute missing values, standardise features.
+    \item Train and evaluate six ML classifiers: Logistic Regression, SVM (Linear), SVM (RBF), Random Forest, KNN, and Na\"{\i}ve Bayes.
+    \item Compare models across five metrics: Accuracy, Precision, Recall, F1-Score, ROC-AUC.
+    \item Identify the best-performing model and generate detailed evaluation outputs (confusion matrix, ROC curve, feature importance).
+    \item Document suggested improvements for future work.
+\end{itemize}
+
+\subsection{Scope of the Project}
+
+\subsubsection*{Application Areas}
+\begin{itemize}
+    \item \textbf{Email providers} (Gmail, Outlook, Yahoo) - real-time inbox filtering.
+    \item \textbf{Corporate IT security} - protecting employees from phishing.
+    \item \textbf{Academic research} - baseline study for advanced NLP spam models.
+    \item \textbf{Embedded security appliances} - lightweight rule-based + ML spam gates.
+\end{itemize}
+
+\subsubsection*{Limitations}
+\begin{itemize}
+    \item The Spambase dataset uses \textbf{bag-of-words} word-frequency features; it does not capture semantic meaning, header information, HTML structure, or image content.
+    \item The word list is fixed and was curated in the late 1990s, certain modern spam phrases are absent.
+    \item The model operates on pre-computed numerical features, it cannot directly classify raw email text without a feature-extraction pipeline.
+    \item No temporal information is included, so concept drift (spam tactics evolve over time) is not handled.
+\end{itemize}
+
+\section{System Analysis}
+
+\subsection{Existing System}
+Traditional spam filters rely on:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|p{4cm}|p{6cm}|}
+\hline
+\textbf{Approach} & \textbf{Description} & \textbf{Limitation} \\ \hline
+\textbf{Rule-based filters} & Manually crafted keyword blacklists & Easily bypassed; require constant manual updates \\ \hline
+\textbf{Bayesian filters} & Na\"{\i}ve Bayes on word counts & Good baseline, but struggles with adversarial spam (deliberate misspellings) \\ \hline
+\textbf{Blacklist / IP reputation} & Block known spam servers & Only works for known senders; zero-day spam bypasses it \\ \hline
+\textbf{Content-based heuristics} & Scoring based on phrases like ``FREE!!!'' & Rigid, easily evaded, high false-positive risk \\ \hline
+\end{tabular}
+\end{table}
+
+\textbf{Key limitations of existing systems:}
+\begin{itemize}
+    \item High maintenance cost (manual rule updates).
+    \item Poor generalisation to novel spam campaigns.
+    \item High false-positive rate (legitimate emails marked as spam).
+    \item No learning from new patterns without human intervention.
+\end{itemize}
+
+\subsection{Proposed System}
+Our proposed system trains multiple \textbf{supervised ML classifiers} end-to-end on a labelled dataset, allowing the model to \textbf{automatically learn discriminative patterns} without manual rule crafting.
+
+\vspace{1em}
+
+\textbf{Advantages:}
+\begin{itemize}
+    \item \textbf{Automatic feature learning} - the classifier discovers discriminative patterns from data.
+    \item \textbf{Better generalisation} - ensemble methods like Random Forest are robust to overfitting.
+    \item \textbf{Quantifiable performance} - metrics such as ROC-AUC and F1-score give objective quality measures.
+    \item \textbf{Extensible} - new features (e.g., URL count, header fields) can be added without redesigning the system.
+    \item \textbf{Reproducible} - the entire pipeline is scripted and version-controlled.
+\end{itemize}
+
+\subsection{Feasibility Study}
+
+\subsubsection*{Technical Feasibility}
+The project uses the Python ecosystem (scikit-learn, pandas, NumPy, Matplotlib, Seaborn), all of which are open-source and run on any standard laptop or cloud environment. The dataset is small ($<$ 1 MB), so no specialised hardware is required. Training all six models takes around 60 seconds on a mid-range CPU.
+
+\subsubsection*{Economic Feasibility}
+All tools used are \textbf{free and open-source}. The dataset is publicly available from the UCI ML Repository. There are no licensing costs. Deployment on a cloud VM (if needed) would cost only a few cents per hour.
+
+\subsubsection*{Operational Feasibility}
+The notebook-based implementation is easy for instructors and peers to run (Jupyter / VS Code). With minor adaptation, the trained model can be integrated into an email server via a REST API, making it operationally viable for real-world deployment.
+
+\section{Methodology}
+
+\subsection{Workflow Diagram}
+
+\begin{verbatim}
+Raw CSV File (spambase.data)
+        |
+        V
+  Load Dataset
+  (57 features + label)
+        |
+        V
+  Exploratory Data Analysis
+  (class distribution, word-frequency diff,
+   missing-value check)
+        |
+        V
+  Preprocessing
+  +-----------------------------+
+  | 1. Remove duplicates        |
+  | 2. Impute missing values    |
+  |    (column median)          |
+  | 3. Train / Test split 80/20 |
+  |    (stratified)             |
+  | 4. StandardScaler           |
+  +-----------------------------+
+        |
+        V
+  Train 6 Classifiers
+  +------------------------+
+  | Logistic Regression    |
+  | SVM (Linear kernel)    |
+  | SVM (RBF kernel)       |
+  | Random Forest          |
+  | KNN (k = 5)            |
+  | Naive Bayes            |
+  +------------------------+
+        |
+        V
+  Evaluate & Compare
+  (Accuracy / Precision / Recall /
+   F1 / ROC-AUC)
+        |
+        V
+  Best Model -> Detailed Analysis
+  (Confusion Matrix, ROC Curve,
+   Feature Importance,
+   Actual vs Predicted)
+        |
+        V
+  Output & Conclusions
+\end{verbatim}
+
+\subsection{Algorithms Used}
+
+\subsubsection*{a) Logistic Regression}
+A linear model that estimates the probability of a sample belonging to class 1 (spam):
+
+\begin{equation}
+P(y=1 \mid \mathbf{x}) = \sigma(\mathbf{w}^\top \mathbf{x} + b) = \frac{1}{1 + e^{-(\mathbf{w}^\top \mathbf{x} + b)}}
+\end{equation}
+
+The decision boundary is a hyperplane in feature space. Trained with L2 regularisation (\texttt{max\_iter=2000}).
+
+\subsubsection*{b) Support Vector Machine (Linear \& RBF)}
+Finds a maximum-margin hyperplane separating spam from ham.
+\begin{itemize}
+    \item \textbf{Linear kernel}: decision surface is a hyperplane---fast, interpretable.
+    \item \textbf{RBF kernel}: maps features to a higher-dimensional space, capturing non-linear patterns.
+\end{itemize}
+
+\begin{equation}
+K(\mathbf{x}_i, \mathbf{x}_j) = \exp\!\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)
+\end{equation}
+
+\subsubsection*{c) Random Forest}
+An ensemble of \texttt{n\_estimators=200} decision trees trained on bootstrap samples and random feature subsets. Final prediction is made by majority vote.
+
+\textbf{Why it works well here:} the bag-of-words feature space contains many irrelevant features; random feature subsets at each split act as automatic regularisation.
+
+\subsubsection*{d) K-Nearest Neighbours (k = 5)}
+Classifies each test email by a majority vote of its 5 nearest training neighbours (Euclidean distance in scaled feature space).
+
+\subsubsection*{e) Gaussian Na\"{\i}ve Bayes}
+Assumes features are conditionally independent given the class and Gaussian-distributed:
+
+\begin{equation}
+P(x_i \mid y) = \frac{1}{\sqrt{2\pi\sigma_y^2}}\exp\!\left(-\frac{(x_i - \mu_y)^2}{2\sigma_y^2}\right)
+\end{equation}
+
+Historically the standard spam-filter baseline.
+
+\subsection{System Architecture}
+
+\begin{verbatim}
++--------------------------------------------+
+|              USER / EMAIL SERVER           |
++-------------------+------------------------+
+                    | Raw email
+                    V
++--------------------------------------------+
+|        Feature Extraction Layer            |
+|  * Word-frequency computation (48 feats)   |
+|  * Char-frequency computation  (6 feats)   |
+|  * Capital-run statistics      (3 feats)   |
++-------------------+------------------------+
+                    | 57-dim numeric vector
+                    V
++--------------------------------------------+
+|          Preprocessing Pipeline            |
+|  * StandardScaler (fit on training data)   |
++-------------------+------------------------+
+                    | Scaled feature vector
+                    V
++--------------------------------------------+
+|         Trained ML Classifier              |
+|  (Random Forest, 200 trees)                |
++-------------------+------------------------+
+                    | Prediction: Spam / Ham
+                    V
++--------------------------------------------+
+|              OUTPUT / ACTION               |
+|  * Route to inbox (Ham)                    |
+|  * Move to Spam folder (Spam)              |
++--------------------------------------------+
+\end{verbatim}
+
+
+\section{Dataset Description}
+
+\textbf{Source:} UCI Machine Learning Repository---Spambase Data Set\\
+\textit{(Creators: Mark Hopkins, Erik Reeber, George Forman, Jaap Suermondt---Hewlett-Packard Labs, 1999)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Property} & \textbf{Value} \\ \hline
+Total samples & 4,601 \\ \hline
+Spam emails & 1,813 (39.4\%) \\ \hline
+Ham emails & 2,788 (60.6\%) \\ \hline
+Number of features & 57 \\ \hline
+Missing values & None \\ \hline
+File format & CSV (no header) \\ \hline
+File size & $\sim$702 KB \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Feature Groups}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|l|c|p{8cm}|}
+\hline
+\textbf{\#} & \textbf{Group} & \textbf{Features} & \textbf{Description} \\ \hline
+1 & Word frequencies & 48 & Percentage of words in the email that match each word (e.g., \texttt{word\_freq\_free}, \texttt{word\_freq\_money}) \\ \hline
+2 & Character frequencies & 6 & Percentage of characters matching \texttt{;}, \texttt{(}, \texttt{[}, \texttt{!}, \texttt{\$}, \texttt{\#} \\ \hline
+3 & Capital run-length & 3 & Average, longest, and total length of uninterrupted sequences of capital letters \\ \hline
+4 & Label & 1 & \texttt{1} = Spam, \texttt{0} = Ham \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Key Features (Top Spam Indicators)}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Feature} & \textbf{Spam Mean} & \textbf{Ham Mean} & \textbf{Difference} \\ \hline
+\texttt{word\_freq\_free} & $\sim$0.90\% & $\sim$0.07\% & +0.83\% \\ \hline
+\texttt{word\_freq\_money} & $\sim$0.54\% & $\sim$0.03\% & +0.51\% \\ \hline
+\texttt{word\_freq\_remove} & $\sim$0.40\% & $\sim$0.02\% & +0.38\% \\ \hline
+\texttt{char\_freq\_exclaim} & $\sim$0.54\% & $\sim$0.10\% & +0.44\% \\ \hline
+\texttt{char\_freq\_dollar} & $\sim$0.21\% & $\sim$0.01\% & +0.19\% \\ \hline
+\texttt{capital\_run\_length\_total} & $\sim$567 & $\sim$110 & +457 \\ \hline
+\end{tabular}
+\end{table}
+
+
+\section{Implementation}
+
+\subsection{Tools \& Technologies}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Tool / Library} & \textbf{Version} & \textbf{Purpose} \\ \hline
+Python & 3.12 & Core programming language \\ \hline
+Jupyter Notebook / VS Code & --- & Development environment \\ \hline
+pandas & $\ge$ 2.x & Data loading \& manipulation \\ \hline
+NumPy & $\ge$ 1.26 & Numerical computation \\ \hline
+scikit-learn & $\ge$ 1.4 & ML models, preprocessing, metrics \\ \hline
+Matplotlib & $\ge$ 3.8 & Plotting \\ \hline
+Seaborn & $\ge$ 0.13 & Statistical visualisations \\ \hline
+Git / GitHub & --- & Version control \& collaboration \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Steps of Implementation}
+
+\subsubsection*{Step 1 --- Data Collection}
+The Spambase CSV file (\texttt{spambase.data}) was obtained from the UCI ML Repository. Because it has no header row, column names were manually assigned based on the UCI documentation (48 word-frequency names, 6 character-frequency names, 3 capital run-length names, and \texttt{label}).
+
+\subsubsection*{Step 2 --- Preprocessing}
+
+\begin{lstlisting}[language=Python]
+# Remove duplicates
+df = df.drop_duplicates()
+
+# Impute missing values (in case any exist after future updates)
+df = df.fillna(df.median(numeric_only=True))
+
+# Feature / target split
+X = df.drop("label", axis=1)
+y = df["label"]
+
+# Stratified 80/20 train-test split
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# Feature scaling
+scaler = StandardScaler()
+X_train_sc = scaler.fit_transform(X_train)
+X_test_sc  = scaler.transform(X_test)
+\end{lstlisting}
+
+\vspace{1em}
+
+\textbf{Why StandardScaler?} Distance-based models (KNN, SVM) are very sensitive to feature magnitude. The capital run-length features have values in the hundreds, while word-frequency features are in the range 0--100. Scaling ensures no single feature dominates due to its scale.
+
+\subsubsection*{Step 3 --- Model Training}
+
+\begin{lstlisting}[language=Python]
+MODELS = {
+    "Logistic Regression" : LogisticRegression(max_iter=2000, random_state=42),
+    "SVM (Linear)"        : SVC(kernel="linear", probability=True, random_state=42),
+    "SVM (RBF)"           : SVC(kernel="rbf",    probability=True, random_state=42),
+    "Random Forest"       : RandomForestClassifier(n_estimators=200, random_state=42),
+    "KNN (k=5)"           : KNeighborsClassifier(n_neighbors=5),
+    "Naive Bayes"         : GaussianNB(),
+}
+
+for name, model in MODELS.items():
+    model.fit(X_train_sc, y_train)
+\end{lstlisting}
+
+\subsubsection*{Step 4 --- Testing \& Evaluation}
+
+\begin{lstlisting}[language=Python]
+for name, model in MODELS.items():
+    y_pred = model.predict(X_test_sc)
+    y_prob = model.predict_proba(X_test_sc)[:, 1]
+    print(f"{name}: Accuracy={accuracy_score(y_test, y_pred)*100:.2f}%  "
+          f"ROC-AUC={roc_auc_score(y_test, y_prob):.4f}")
+\end{lstlisting}
+
+\subsection{Code Snippets}
+
+\subsubsection*{Confusion Matrix Heatmap}
+
+\begin{lstlisting}[language=Python]
+cm = confusion_matrix(y_test, y_pred_best)
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues",
+            xticklabels=["Ham", "Spam"],
+            yticklabels=["Ham", "Spam"])
+plt.title(f"Confusion Matrix - {best_name}")
+plt.ylabel("Actual");  plt.xlabel("Predicted")
+plt.show()
+\end{lstlisting}
+
+\subsubsection*{ROC Curve (All Models)}
+
+\begin{lstlisting}[language=Python]
+for name, model in MODELS.items():
+    y_prob = model.predict_proba(X_test_sc)[:, 1]
+    fpr, tpr, _ = roc_curve(y_test, y_prob)
+    auc = roc_auc_score(y_test, y_prob)
+    plt.plot(fpr, tpr, label=f"{name} (AUC={auc:.3f})")
+plt.plot([0,1],[0,1],"k--")
+plt.xlabel("FPR");  plt.ylabel("TPR")
+plt.legend(fontsize=8)
+plt.show()
+\end{lstlisting}
+
+\subsubsection*{Feature Importance (Random Forest)}
+
+\begin{lstlisting}[language=Python]
+feat_imp = pd.Series(rf_model.feature_importances_, index=X.columns)
+feat_imp.sort_values(ascending=False).head(20).sort_values().plot(kind="barh")
+plt.title("Top 20 Feature Importances - Random Forest")
+plt.show()
+\end{lstlisting}
+
+\section{Results and Discussion}
+
+\subsection{Performance Summary}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} & \textbf{ROC-AUC} \\ \hline
+\textbf{Random Forest} & \textbf{94.30\%} & \textbf{94.48\%} & \textbf{94.30\%} & \textbf{94.31\%} & \textbf{$\sim$0.990} \\ \hline
+SVM (Linear) & 93.59\% & 93.65\% & 93.59\% & 93.57\% & $\sim$0.985 \\ \hline
+Logistic Regression & 93.47\% & 93.54\% & 93.47\% & 93.45\% & $\sim$0.983 \\ \hline
+SVM (RBF) & 93.23\% & 93.31\% & 93.23\% & 93.21\% & $\sim$0.982 \\ \hline
+KNN (k=5) & 91.33\% & 91.55\% & 91.33\% & 91.33\% & $\sim$0.965 \\ \hline
+Na\"{\i}ve Bayes & 82.90\% & 84.20\% & 82.90\% & 82.47\% & $\sim$0.940 \\ \hline
+\end{tabular}
+\end{table}
+\textit{(Metric values are approximate; exact values may vary slightly due to dataset preprocessing.)}
+
+\subsection{Performance Metrics --- Definitions}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Metric} & \textbf{Formula} & \textbf{Meaning} \\ \hline
+\textbf{Accuracy} & (TP + TN) / Total & Overall correct predictions \\ \hline
+\textbf{Precision} & TP / (TP + FP) & Of all predicted spam, how many are actually spam? \\ \hline
+\textbf{Recall} & TP / (TP + FN) & Of all actual spam, how many were caught? \\ \hline
+\textbf{F1-Score} & $2 \times (\text{P} \times \text{R}) / (\text{P} + \text{R})$ & Harmonic mean of Precision and Recall \\ \hline
+\textbf{ROC-AUC} & Area under ROC curve & Overall ranking quality across all thresholds \\ \hline
+\end{tabular}
+\end{table}
+
+\noindent\textbf{Note on false negatives (FN):} In spam detection, failing to detect spam (FN) is generally worse than falsely flagging a legitimate email (FP). A higher \textbf{Recall} on the Spam class is therefore the priority metric in practice.
+
+\subsection{Confusion Matrix --- Random Forest (Best Model)}
+
+\begin{verbatim}
+                Predicted
+                Ham    Spam
+Actual  Ham   [ 485     21 ]    -> 95.9% of ham correctly identified
+        Spam  [  27    309 ]    -> 91.9% of spam correctly identified
+\end{verbatim}
+
+\begin{itemize}
+    \item \textbf{False Positives (21):} 21 legitimate emails incorrectly flagged as spam.
+    \item \textbf{False Negatives (27):} 27 spam emails that slipped through to the inbox.
+\end{itemize}
+
+\subsection{Result Analysis}
+\begin{enumerate}
+    \item \textbf{Random Forest} is the clear winner, combining high accuracy with the highest ROC-AUC ($\sim$0.99), showing near-perfect ranking ability across all decision thresholds.
+    \item \textbf{Linear models} (Logistic Regression, SVM-Linear) perform surprisingly close to Random Forest ($\sim$93--94\%) because the Spambase feature space is largely linearly separable once scaled.
+    \item \textbf{Na\"{\i}ve Bayes} (82.9\%) underperforms because it assumes feature independence---in practice, features like \texttt{word\_freq\_free} and \texttt{word\_freq\_money} are highly correlated in spam, violating this assumption.
+    \item \textbf{KNN} (91.3\%) suffers from the curse of dimensionality; with 57 features, distance metrics become less meaningful without further dimensionality reduction.
+    \item \textbf{Top spam-discriminating features} (from Random Forest feature importance): \texttt{capital\_run\_length\_total}, \texttt{word\_freq\_free}, \texttt{char\_freq\_exclaim}, \texttt{char\_freq\_dollar}, \texttt{word\_freq\_remove}, \texttt{word\_freq\_your}.
+\end{enumerate}
+
+\section{Conclusion}
+
+This project successfully demonstrated the application of multiple supervised machine-learning classifiers to the email spam detection problem using the UCI Spambase dataset.
+
+\subsection{Summary of Work}
+\begin{itemize}
+    \item Loaded and explored 4,601 email samples described by 57 engineered features.
+    \item Performed preprocessing including duplicate removal, median imputation, stratified splitting, and StandardScaler normalisation.
+    \item Trained and compared \textbf{six classifiers}: Logistic Regression, SVM (Linear), SVM (RBF), Random Forest, KNN, and Na\"{\i}ve Bayes.
+    \item Evaluated all models using five metrics: Accuracy, Precision, Recall, F1-Score, and ROC-AUC.
+    \item Generated comprehensive visualisations: class distribution, word-frequency analysis, accuracy comparison, confusion matrix, ROC curves, and feature importance.
+\end{itemize}
+
+\subsection{Key Achievements}
+\begin{itemize}
+    \item Achieved a best test accuracy of \textbf{94.30\%} and ROC-AUC of \textbf{$\sim$0.99} with Random Forest.
+    \item Identified \texttt{capital\_run\_length\_total}, \texttt{word\_freq\_free}, and \texttt{char\_freq\_exclaim} as the strongest spam indicators.
+    \item Produced a clean, reproducible Jupyter Notebook (\texttt{Email\_Spam\_Detection\_Improved.ipynb}) that follows software engineering best practices (single \texttt{RANDOM\_STATE}, modular code, inline explanations).
+\end{itemize}
+
+\subsection{Future Improvements}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Improvement} & \textbf{Expected Benefit} \\ \hline
+Hyperparameter tuning (GridSearchCV) & +1--3\% accuracy \\ \hline
+10-fold cross-validation & More reliable performance estimate \\ \hline
+SMOTE / class-weight balancing & Improved recall on spam class \\ \hline
+log1p transform on skewed features & Better KNN / SVM performance \\ \hline
+Ensemble stacking & Marginal accuracy gain \\ \hline
+Feature selection (SelectKBest, PCA) & Faster inference, interpretability \\ \hline
+Cost-sensitive learning & Minimise false-negative rate \\ \hline
+Model serialisation (joblib) & Production deployment readiness \\ \hline
+\end{tabular}
+\end{table}
+
+\section{References}
+
+\begin{enumerate}
+    \item M. Hopkins, E. Reeber, G. Forman, and J. Suermondt, ``Spambase Data Set,'' UCI Machine Learning Repository, 1999. [Online]. Available: \url{https://archive.ics.uci.edu/ml/datasets/Spambase}
+    \item T. Hastie, R. Tibshirani, and J. Friedman, \textit{The Elements of Statistical Learning}, 2nd ed. New York, USA: Springer, 2009.
+    \item F. Pedregosa \textit{et al.}, ``Scikit-learn: Machine Learning in Python,'' \textit{Journal of Machine Learning Research}, vol. 12, pp. 2825--2830, 2011.
+    \item L. Breiman, ``Random Forests,'' \textit{Machine Learning}, vol. 45, no. 1, pp. 5--32, 2001.
+    \item C. Cortes and V. Vapnik, ``Support-Vector Networks,'' \textit{Machine Learning}, vol. 20, no. 3, pp. 273--297, 1995.
+    \item I. Androutsopoulos, J. Koutsias, K. V. Chandrinos, and C. D. Spyropoulos, ``An Experimental Comparison of Naive Bayesian and Keyword-Based Anti-Spam Filtering with Encrypted Personal E-Mail Messages,'' \textit{Proc. 23rd ACM SIGIR}, pp. 160--167, 2000.
+    \item Antispamengine.com, ``Spam Statistics,'' 2024. [Online]. Available: \url{https://antispamengine.com/spam-statistics/}
+\end{enumerate}
+
+\vspace{1cm}
+\begin{center}
+\textit{Report prepared for Machine Learning CA-2 Assessment, KIET Deemed to Be University, 13 April 2026.}
+\end{center}
+
+\end{document}
